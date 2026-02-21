@@ -1,0 +1,12 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DNSDIST_URL:
+      DNSDIST_API_KEY:
+      PIHOLE1_HREF:
+      PIHOLE2_HREF:
+      PRIMARY_THRESHOLD: 10
+      REFRESH_INTERVAL: 10000
