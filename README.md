@@ -1,2 +1,77 @@
 # losmuertos-dnsdist
-Custom dnsdist iFrame for Homepage
+
+[![Docker Image](https://img.shields.io/badge/ghcr.io-losmuertos--dnsdist-blue?logo=docker&logoColor=white)](https://github.com/StelianMorariu/losmuertos-dnsdist/pkgs/container/losmuertos-dnsdist)
+
+A lightweight iFrame widget for [Homepage](https://gethomepage.dev) that displays live status from a [dnsdist](https://dnsdist.org) DNS load balancer.
+
+![Screenshot](docs/screenshot.png)
+
+## What it does
+
+Queries the dnsdist REST API on a configurable interval and renders a small dashboard showing:
+
+- **Primary servers** (Pi-hole instances) — name, IP, Up/Down state, query and response counts, with optional links to each Pi-hole admin UI
+- **Cloud Failover** — aggregated view of fallback resolvers (e.g. Cloudflare), with combined query/response totals
+- **Overall health** — exposed via a `/health` endpoint (HTTP 200 = healthy, 503 = unreachable) for Docker and Homepage health checks
+
+The page auto-refreshes client-side via `fetch` on a configurable interval. If the dnsdist API is unreachable, the last known server state is preserved in the UI.
+
+## Usage
+
+### Docker Compose
+
+```yaml
+services:
+  losmuertos-dnsdist:
+    image: ghcr.io/stelianmorariu/losmuertos-dnsdist:latest
+    ports:
+      - "8000:8000"
+    environment:
+      DNSDIST_URL: http://dnsdist:8083
+      DNSDIST_API_KEY: your-api-key
+      PIHOLE1_HREF: http://pihole1/admin
+      PIHOLE2_HREF: http://pihole2/admin
+      PRIMARY_THRESHOLD: 10      # servers with order < threshold are primaries
+      REFRESH_INTERVAL: 10000    # milliseconds
+    restart: unless-stopped
+```
+
+### Homepage iFrame widget
+
+```yaml
+- DNS:
+    - dnsdist:
+        widget:
+          type: iframe
+          src: http://losmuertos-dnsdist:8000
+          classes: h-36
+```
+
+## Environment variables
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `DNSDIST_URL` | Yes | — | Base URL of the dnsdist API (e.g. `http://dnsdist:8083`) |
+| `DNSDIST_API_KEY` | Yes | — | dnsdist API key (`setWebserverConfig` in dnsdist config) |
+| `PIHOLE1_HREF` | No | `#` | Link target for the first primary server card |
+| `PIHOLE2_HREF` | No | `#` | Link target for the second primary server card |
+| `PRIMARY_THRESHOLD` | No | `10` | Servers with `order < threshold` are shown as primaries |
+| `REFRESH_INTERVAL` | No | `10000` | Page refresh interval in milliseconds |
+| `IS_DEV` | No | — | Set to `true` to load data from `dev-data.json` instead of the API |
+
+## Endpoints
+
+| Endpoint | Description |
+|---|---|
+| `GET /` | The dashboard HTML page |
+| `GET /data` | JSON data used by the page (primaries, fallbacks, config) |
+| `GET /health` | `200 OK` if last dnsdist fetch succeeded, `503` otherwise |
+
+## Local development
+
+```bash
+cp .env.example .env   # fill in your values, or set IS_DEV=true
+node src/server.js
+```
+
+With `IS_DEV=true`, the server reads from `dev-data.json` in the project root instead of calling the dnsdist API. Edit `src/index.html` and refresh the browser — no server restart needed.

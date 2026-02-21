@@ -1,7 +1,11 @@
 FROM node:alpine
 
 ARG VERSION=unknown
-LABEL org.opencontainers.image.version=$VERSION
+LABEL org.opencontainers.image.title="losmuertos-dnsdist" \
+      org.opencontainers.image.description="dnsdist iFrame widget for Homepage" \
+      org.opencontainers.image.url="https://github.com/StelianMorariu/losmuertos-dnsdist" \
+      org.opencontainers.image.source="https://github.com/StelianMorariu/losmuertos-dnsdist" \
+      org.opencontainers.image.version=$VERSION
 
 ENV APP_VERSION=$VERSION
 
