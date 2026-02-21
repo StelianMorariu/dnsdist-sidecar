@@ -13,8 +13,9 @@ try {
     const value = trimmed.slice(eq + 1).trim();
     if (!(key in process.env)) process.env[key] = value;
   }
+  console.log('.env loaded');
 } catch {
-  // no .env file present, continue
+  console.log('No .env file found, using environment variables');
 }
 
 const PORT = 8000;
@@ -116,8 +117,10 @@ const server = http.createServer(async (req, res) => {
       primaries = data.primaries;
       fallbacks = data.fallbacks;
       lastHealthStatus = 'healthy';
+      console.log('dnsdist fetch OK');
     } catch (err) {
-      console.error(err);
+      const reason = err.name === 'AbortError' ? 'timed out' : err.message;
+      console.log('dnsdist fetch failed: ' + reason);
       lastHealthStatus = 'unreachable';
     }
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -141,6 +144,12 @@ const server = http.createServer(async (req, res) => {
   res.end('Not Found');
 });
 
+server.on('error', (err) => {
+  console.error('Server error: ' + err.message);
+  process.exit(1);
+});
+
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server listening on http://0.0.0.0:${PORT}`);
+  console.log(`Server listening on 0.0.0.0:${PORT}`);
+  console.log(`Mode: ${IS_DEV === 'true' ? 'development' : 'production'}`);
 });
