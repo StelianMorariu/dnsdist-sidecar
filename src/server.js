@@ -30,6 +30,8 @@ const {
 
 const primaryThreshold = parseInt(PRIMARY_THRESHOLD, 10);
 
+let lastHealthStatus = 'unreachable';
+
 if (IS_DEV !== 'true') {
   const missing = ['DNSDIST_URL', 'DNSDIST_API_KEY'].filter(k => !process.env[k]);
   if (missing.length > 0) {
@@ -113,8 +115,10 @@ const server = http.createServer(async (req, res) => {
       const data = await fetchDnsDistData();
       primaries = data.primaries;
       fallbacks = data.fallbacks;
+      lastHealthStatus = 'healthy';
     } catch (err) {
       console.error(err);
+      lastHealthStatus = 'unreachable';
     }
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
@@ -124,6 +128,12 @@ const server = http.createServer(async (req, res) => {
       pihole2Href: PIHOLE2_HREF,
       refreshInterval: parseInt(REFRESH_INTERVAL, 10),
     }));
+    return;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/health') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: lastHealthStatus }));
     return;
   }
 
