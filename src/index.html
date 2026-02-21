@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>dnsdist</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>body { font-family: 'Inter', sans-serif; }</style>
+</head>
+<body class="bg-zinc-900 text-zinc-100 p-3">
+  <div id="root"></div>
+  <script>
+    const PIHOLE_ICON = 'https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/webp/pi-hole-unbound.webp';
+    const CLOUDFLARE_ICON = 'https://raw.githubusercontent.com/homarr-labs/dashboard-icons/main/svg/cloudflare.svg';
+
+    function stripPort(address) {
+      return address.replace(/:\d+$/, '');
+    }
+
+    function stateBadge(state) {
+      return state === 'up'
+        ? '<span class="px-2 py-0.5 rounded text-xs font-medium bg-green-500/20 text-green-400">Up</span>'
+        : '<span class="px-2 py-0.5 rounded text-xs font-medium bg-red-500/20 text-red-400">Down</span>';
+    }
+
+    function iconWrapper(src) {
+      return `<div class="w-9 h-9 flex items-center justify-center shrink-0">
+        <img src="${src}" class="w-full h-full object-contain" alt="">
+      </div>`;
+    }
+
+    function primaryCard(server, pihole1Href, pihole2Href) {
+      const ip = stripPort(server.address);
+      const href = server.order === 1 ? pihole1Href : server.order === 2 ? pihole2Href : null;
+
+      const inner = `
+        <div class="flex items-start gap-3 mb-3">
+          ${iconWrapper(PIHOLE_ICON)}
+          <div class="flex-1 min-w-0">
+            <div class="flex items-start justify-between mb-1">
+              <span class="font-medium text-zinc-200">${server.name}</span>
+              ${stateBadge(server.state)}
+            </div>
+            <div class="text-xs text-zinc-400 font-mono">${ip}</div>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-1 text-xs">
+          <div><div class="text-xs text-zinc-500 mb-0.5">Queries</div><div class="text-sm text-zinc-200">${server.queries.toLocaleString()}</div></div>
+          <div><div class="text-xs text-zinc-500 mb-0.5">Responses</div><div class="text-sm text-zinc-200">${server.responses.toLocaleString()}</div></div>
+        </div>`;
+
+      if (href) {
+        return `<a href="${href}" target="_blank" rel="noopener noreferrer" class="block bg-zinc-800 rounded-lg p-3 text-zinc-100 hover:bg-zinc-700 transition-colors">${inner}</a>`;
+      }
+      return `<div class="bg-zinc-800 rounded-lg p-3">${inner}</div>`;
+    }
+
+    function fallbackCard(fallbacks) {
+      const totalQueries = fallbacks.reduce((sum, s) => sum + s.queries, 0);
+      const totalResponses = fallbacks.reduce((sum, s) => sum + s.responses, 0);
+      const ipList = `<div class="text-xs text-zinc-400 font-mono">${fallbacks.map(s => stripPort(s.address)).join(', ')}</div>`;
+
+      return `
+        <div class="bg-zinc-800 rounded-lg p-3">
+          <div class="flex items-start gap-3 mb-3">
+            ${iconWrapper(CLOUDFLARE_ICON)}
+            <div class="flex-1 min-w-0">
+              <div class="font-medium text-zinc-200 mb-1">Cloud Failover</div>
+              ${ipList}
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-1 text-xs">
+            <div><div class="text-xs text-zinc-500 mb-0.5">Queries</div><div class="text-sm text-zinc-200">${totalQueries.toLocaleString()}</div></div>
+            <div><div class="text-xs text-zinc-500 mb-0.5">Responses</div><div class="text-sm text-zinc-200">${totalResponses.toLocaleString()}</div></div>
+          </div>
+        </div>`;
+    }
+
+    function render(primaries, fallbacks, config, healthy) {
+      const timestamp = new Date().toTimeString().slice(0, 8);
+
+      const healthBadge = healthy
+        ? '<span class="px-2 py-1 rounded text-xs font-medium bg-green-500/20 text-green-400">Healthy</span>'
+        : '<span class="px-2 py-1 rounded text-xs font-medium bg-red-500/20 text-red-400">Unreachable</span>';
+
+      const hasPrimaries = primaries && primaries.length > 0;
+      const hasFallbacks = fallbacks && fallbacks.length > 0;
+      const grid = (hasPrimaries || hasFallbacks)
+        ? `<div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            ${hasPrimaries ? primaries.map(s => primaryCard(s, config.pihole1Href, config.pihole2Href)).join('\n') : ''}
+            ${hasFallbacks ? fallbackCard(fallbacks) : ''}
+          </div>`
+        : '';
+
+      document.getElementById('root').innerHTML = `
+        <div class="flex items-center justify-between mb-3">
+          <h1 class="text-sm font-semibold tracking-widest text-zinc-300 uppercase">DNS Dist</h1>
+          ${healthBadge}
+        </div>
+        ${grid}
+        <div class="mt-3 text-xs text-zinc-600 text-right">Last updated: ${timestamp}</div>`;
+    }
+
+    let cachedPrimaries = null;
+    let cachedFallbacks = null;
+    let lastConfig = { pihole1Href: '#', pihole2Href: '#', refreshInterval: 10000 };
+    let refreshTimer = null;
+
+    async function load() {
+      try {
+        const res = await fetch('/data');
+        const data = await res.json();
+
+        lastConfig = {
+          pihole1Href: data.pihole1Href,
+          pihole2Href: data.pihole2Href,
+          refreshInterval: data.refreshInterval,
+        };
+
+        const healthy = data.primaries !== null;
+        if (healthy) {
+          cachedPrimaries = data.primaries;
+          cachedFallbacks = data.fallbacks;
+        }
+
+        render(cachedPrimaries, cachedFallbacks, lastConfig, healthy);
+      } catch (err) {
+        console.error('Failed to fetch /data:', err);
+        render(cachedPrimaries, cachedFallbacks, lastConfig, false);
+      } finally {
+        if (refreshTimer) clearTimeout(refreshTimer);
+        refreshTimer = setTimeout(load, lastConfig.refreshInterval);
+      }
+    }
+
+    load();
+  </script>
+</body>
+</html>

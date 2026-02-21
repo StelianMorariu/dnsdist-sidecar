@@ -18,7 +18,15 @@ try {
 }
 
 const PORT = 8000;
-const { DNSDIST_URL, DNSDIST_API_KEY, PRIMARY_THRESHOLD = '10', IS_DEV } = process.env;
+const {
+  DNSDIST_URL,
+  DNSDIST_API_KEY,
+  PRIMARY_THRESHOLD = '10',
+  IS_DEV,
+  PIHOLE1_HREF = '#',
+  PIHOLE2_HREF = '#',
+  REFRESH_INTERVAL = '10000',
+} = process.env;
 
 const primaryThreshold = parseInt(PRIMARY_THRESHOLD, 10);
 
@@ -37,15 +45,20 @@ async function fetchDnsDistData() {
     const raw = readFileSync(new URL('../dev-data.json', import.meta.url), 'utf8');
     json = JSON.parse(raw);
   } else {
-    const response = await fetch(`${DNSDIST_URL}/api/v1/servers/localhost`, {
-      headers: { 'X-API-Key': DNSDIST_API_KEY },
-    });
-
-    if (!response.ok) {
-      throw new Error(`dnsdist API responded ${response.status} ${response.statusText}`);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    try {
+      const response = await fetch(`${DNSDIST_URL}/api/v1/servers/localhost`, {
+        headers: { 'X-API-Key': DNSDIST_API_KEY },
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        throw new Error(`dnsdist API responded ${response.status} ${response.statusText}`);
+      }
+      json = await response.json();
+    } finally {
+      clearTimeout(timeoutId);
     }
-
-    json = await response.json();
   }
 
   const { servers, statistics, pools, version } = json;
@@ -83,25 +96,34 @@ async function fetchDnsDistData() {
   };
 }
 
-function renderTemplate(data) {
-  // TODO: render HTML template
-  console.log('Template data:', JSON.stringify(data, null, 2));
-}
-
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
   if (req.method === 'GET' && url.pathname === '/') {
+    const html = readFileSync(new URL('./index.html', import.meta.url), 'utf8');
+    res.writeHead(200, { 'Content-Type': 'text/html' });
+    res.end(html);
+    return;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/data') {
+    let primaries = null;
+    let fallbacks = null;
     try {
       const data = await fetchDnsDistData();
-      renderTemplate(data);
-      res.writeHead(200, { 'Content-Type': 'text/plain' });
-      res.end('ok');
+      primaries = data.primaries;
+      fallbacks = data.fallbacks;
     } catch (err) {
       console.error(err);
-      res.writeHead(500, { 'Content-Type': 'text/plain' });
-      res.end('Internal Server Error');
     }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      primaries,
+      fallbacks,
+      pihole1Href: PIHOLE1_HREF,
+      pihole2Href: PIHOLE2_HREF,
+      refreshInterval: parseInt(REFRESH_INTERVAL, 10),
+    }));
     return;
   }
 
