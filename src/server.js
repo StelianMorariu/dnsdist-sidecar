@@ -132,8 +132,8 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.method === 'GET' && url.pathname === '/health') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ status: lastHealthStatus }));
+    res.writeHead(lastHealthStatus === 'healthy' ? 200 : 503);
+    res.end();
     return;
   }
 
