@@ -1,7 +1,7 @@
 FROM node:alpine
 
 ARG VERSION=unknown
-LABEL org.opencontainers.image.title="losmuertos-dnsdist" \
+LABEL org.opencontainers.image.title="dnsdist-sidecar" \
       org.opencontainers.image.description="dnsdist iFrame widget for Homepage" \
       org.opencontainers.image.url="https://github.com/StelianMorariu/losmuertos-dnsdist" \
       org.opencontainers.image.source="https://github.com/StelianMorariu/losmuertos-dnsdist" \
