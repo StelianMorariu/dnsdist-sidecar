@@ -15,9 +15,6 @@
 <body class="text-zinc-100">
   <div id="root"></div>
   <script>
-    const PIHOLE_ICON = 'https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/webp/pi-hole-unbound.webp';
-    const CLOUDFLARE_ICON = 'https://raw.githubusercontent.com/homarr-labs/dashboard-icons/main/svg/cloudflare.svg';
-
     // Resolves the active layout tier.
     // configLayout: 'auto' | 'detail' | 'compact' (from config.json via /data)
     // Returns 'detail' (3-col + stats) or 'compact' (1-col, no stats).
@@ -31,6 +28,9 @@
     function stripPort(address) {
       return address.replace(/:\d+$/, '');
     }
+
+    const ESC = {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'};
+    function esc(s) { return String(s).replace(/[&<>"']/g, c => ESC[c]); }
 
     function stateBadge(state) {
       return state === 'up'
@@ -54,19 +54,19 @@
     }
 
     // Primary server card (Pi-hole). Renders as a link if a pihole href is configured.
-    function primaryCard(server, pihole1Href, pihole2Href, showStats) {
+    function primaryCard(server, pihole1Href, pihole2Href, showStats, icon) {
       const ip = stripPort(server.address);
       const href = server.order === 1 ? pihole1Href : server.order === 2 ? pihole2Href : null;
 
       const inner = `
         <div class="flex items-start gap-3">
-          ${iconWrapper(PIHOLE_ICON)}
+          ${iconWrapper(icon)}
           <div class="flex-1 min-w-0">
             <div class="flex items-start justify-between mb-1">
-              <span class="font-medium text-zinc-200">${server.name}</span>
+              <span class="font-medium text-zinc-200">${esc(server.name)}</span>
               ${stateBadge(server.state)}
             </div>
-            <div class="text-xs text-zinc-400 font-mono">${ip}</div>
+            <div class="text-xs text-zinc-400 font-mono">${esc(ip)}</div>
           </div>
         </div>
         ${showStats ? statsRow(server.queries, server.responses) : ''}`;
@@ -79,16 +79,16 @@
 
     // Fallback/cloud card — aggregates all fallback resolvers into a single card.
     // State is 'up' if at least one fallback is up, 'down' if all are down.
-    function fallbackCard(fallbacks, showStats) {
+    function fallbackCard(fallbacks, showStats, icon) {
       const totalQueries = fallbacks.reduce((sum, s) => sum + s.queries, 0);
       const totalResponses = fallbacks.reduce((sum, s) => sum + s.responses, 0);
       const state = fallbacks.some(s => s.state === 'up') ? 'up' : 'down';
-      const ipList = `<div class="text-xs text-zinc-400 font-mono">${fallbacks.map(s => stripPort(s.address)).join(', ')}</div>`;
+      const ipList = `<div class="text-xs text-zinc-400 font-mono">${fallbacks.map(s => esc(stripPort(s.address))).join(', ')}</div>`;
 
       return `
         <div class="bg-zinc-800 rounded-lg p-3">
           <div class="flex items-start gap-3">
-            ${iconWrapper(CLOUDFLARE_ICON)}
+            ${iconWrapper(icon)}
             <div class="flex-1 min-w-0">
               <div class="flex items-start justify-between mb-1">
                 <span class="font-medium text-zinc-200">Cloud Failover</span>
@@ -126,15 +126,18 @@
 
       root.innerHTML = `
         <div class="grid grid-cols-${cols} gap-3">
-          ${hasPrimaries ? primaries.map(s => primaryCard(s, config.pihole1Href, config.pihole2Href, detail)).join('\n') : ''}
-          ${hasFallbacks ? fallbackCard(fallbacks, detail) : ''}
+          ${hasPrimaries ? primaries.map(s => primaryCard(s, config.pihole1Href, config.pihole2Href, detail, s.order === 1 ? config.primaryServerIcon : config.secondaryServerIcon)).join('\n') : ''}
+          ${hasFallbacks ? fallbackCard(fallbacks, detail, config.failoverServerIcon) : ''}
           <div style="grid-column: 1 / -1" class="text-xs text-zinc-400 text-right pr-1 pb-1">Last updated: ${timestamp}</div>
         </div>`;
     }
 
     let cachedPrimaries = null;
     let cachedFallbacks = null;
-    let lastConfig = { pihole1Href: '#', pihole2Href: '#', refreshInterval: 10000, layout: 'auto' };
+    let lastConfig = {
+      pihole1Href: '#', pihole2Href: '#', refreshInterval: 10000, layout: 'auto',
+      primaryServerIcon: null, secondaryServerIcon: null, failoverServerIcon: null,
+    };
     let refreshTimer = null;
 
     // Fetches fresh data from /data and re-renders. On error the last known
@@ -149,6 +152,9 @@
           pihole2Href: data.pihole2Href,
           refreshInterval: data.refreshInterval,
           layout: data.layout,
+          primaryServerIcon: data.primaryServerIcon,
+          secondaryServerIcon: data.secondaryServerIcon,
+          failoverServerIcon: data.failoverServerIcon,
         };
 
         if (data.primaries !== null) {

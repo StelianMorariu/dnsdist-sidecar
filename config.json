@@ -1,3 +1,6 @@
 {
-  "layout": "auto"
+  "layout": "auto",
+  "primaryServerIcon": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/webp/pi-hole-unbound.webp",
+  "secondaryServerIcon": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/webp/pi-hole-unbound.webp",
+  "failoverServerIcon": "https://raw.githubusercontent.com/homarr-labs/dashboard-icons/main/svg/cloudflare.svg"
 }

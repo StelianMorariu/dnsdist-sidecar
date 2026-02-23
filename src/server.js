@@ -46,16 +46,27 @@ if (IS_DEV !== 'true') {
 }
 
 const VALID_LAYOUTS = ['auto', 'detail', 'compact'];
+const DEFAULT_CONFIG = {
+  layout: 'auto',
+  primaryServerIcon: 'https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/webp/pi-hole-unbound.webp',
+  secondaryServerIcon: 'https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/webp/pi-hole-unbound.webp',
+  failoverServerIcon: 'https://raw.githubusercontent.com/homarr-labs/dashboard-icons/main/svg/cloudflare.svg',
+};
 
 // Read config.json on every call so changes take effect on the next page refresh
-// without requiring a container restart. Falls back to 'auto' if the file is
-// missing, unreadable, or contains an unrecognised value.
+// without requiring a container restart. Falls back to defaults if the file is
+// missing, unreadable, or contains unrecognised values.
 function readConfig() {
   try {
-    const { layout } = JSON.parse(readFileSync(new URL('../config.json', import.meta.url), 'utf8'));
-    if (VALID_LAYOUTS.includes(layout)) return layout;
+    const raw = JSON.parse(readFileSync(new URL('../config.json', import.meta.url), 'utf8'));
+    return {
+      layout: VALID_LAYOUTS.includes(raw.layout) ? raw.layout : DEFAULT_CONFIG.layout,
+      primaryServerIcon: raw.primaryServerIcon || DEFAULT_CONFIG.primaryServerIcon,
+      secondaryServerIcon: raw.secondaryServerIcon || DEFAULT_CONFIG.secondaryServerIcon,
+      failoverServerIcon: raw.failoverServerIcon || DEFAULT_CONFIG.failoverServerIcon,
+    };
   } catch {}
-  return 'auto';
+  return DEFAULT_CONFIG;
 }
 
 // Fetches server data from the dnsdist REST API (or dev-data.json in IS_DEV mode).
@@ -132,7 +143,7 @@ const server = http.createServer(async (req, res) => {
       pihole1Href: PIHOLE1_HREF,
       pihole2Href: PIHOLE2_HREF,
       refreshInterval,
-      layout: readConfig(),
+      ...readConfig(),
     }));
     return;
   }
