@@ -48,8 +48,8 @@ services:
         widget:
           type: iframe
           src: http://dnsdist-sidecar:8000
-          classes: h-56 md:h-40  # auto layout: compact on mobile, detail on wider screens
-          # classes: h-40        # detail layout only
+          classes: h-56 md:h-32  # auto layout: compact on mobile, detail on wider screens
+          # classes: h-32        # detail layout only
           # classes: h-56        # compact layout only
 ```
 
