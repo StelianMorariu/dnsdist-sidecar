@@ -69,15 +69,19 @@ The display layout is controlled by `config.json`. The default is baked into the
 
 ```json
 {
-  "layout": "auto"
+  "layout": "auto",
+  "primaryServerIcon": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/webp/pi-hole-unbound.webp",
+  "secondaryServerIcon": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/webp/pi-hole-unbound.webp",
+  "failoverServerIcon": "https://raw.githubusercontent.com/homarr-labs/dashboard-icons/main/svg/cloudflare.svg"
 }
 ```
 
-| Value | Behaviour |
-|---|---|
-| `auto` | Detail view when the widget is ≥ 834px wide, compact otherwise |
-| `detail` | Always 3-column with query/response stats |
-| `compact` | Always single-column, stats hidden |
+| Key | Default | Description |
+|---|---|---|
+| `layout` | `auto` | `auto` — detail when ≥ 834px wide, compact otherwise; `detail` — always 3-column with stats; `compact` — always single-column, stats hidden |
+| `primaryServerIcon` | Pi-hole Unbound icon | URL of the icon shown on the first primary server card |
+| `secondaryServerIcon` | Pi-hole Unbound icon | URL of the icon shown on the second primary server card |
+| `failoverServerIcon` | Cloudflare icon | URL of the icon shown on the cloud failover card |
 
 Changes to `config.json` take effect on the next browser refresh — no container restart needed.
 
