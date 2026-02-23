@@ -26,7 +26,7 @@ const {
   IS_DEV,
   PIHOLE1_HREF = '#',
   PIHOLE2_HREF = '#',
-  REFRESH_INTERVAL = '120000',
+  REFRESH_INTERVAL = '20000',
 } = process.env;
 
 const primaryThreshold = parseInt(PRIMARY_THRESHOLD, 10);
