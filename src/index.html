@@ -78,9 +78,11 @@
     }
 
     // Fallback/cloud card — aggregates all fallback resolvers into a single card.
+    // State is 'up' if at least one fallback is up, 'down' if all are down.
     function fallbackCard(fallbacks, showStats) {
       const totalQueries = fallbacks.reduce((sum, s) => sum + s.queries, 0);
       const totalResponses = fallbacks.reduce((sum, s) => sum + s.responses, 0);
+      const state = fallbacks.some(s => s.state === 'up') ? 'up' : 'down';
       const ipList = `<div class="text-xs text-zinc-400 font-mono">${fallbacks.map(s => stripPort(s.address)).join(', ')}</div>`;
 
       return `
@@ -88,7 +90,10 @@
           <div class="flex items-start gap-3">
             ${iconWrapper(CLOUDFLARE_ICON)}
             <div class="flex-1 min-w-0">
-              <div class="font-medium text-zinc-200 mb-1">Cloud Failover</div>
+              <div class="flex items-start justify-between mb-1">
+                <span class="font-medium text-zinc-200">Cloud Failover</span>
+                ${stateBadge(state)}
+              </div>
               ${ipList}
             </div>
           </div>
