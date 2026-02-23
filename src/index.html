@@ -9,11 +9,21 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <style>body { font-family: 'Inter', sans-serif; background-color: #333235; }</style>
 </head>
-<body class="text-zinc-100 p-3">
+<body class="text-zinc-100">
   <div id="root"></div>
   <script>
     const PIHOLE_ICON = 'https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/webp/pi-hole-unbound.webp';
     const CLOUDFLARE_ICON = 'https://raw.githubusercontent.com/homarr-labs/dashboard-icons/main/svg/cloudflare.svg';
+
+    // Resolves the active layout tier.
+    // configLayout: 'auto' | 'detail' | 'compact' (from config.json via /data)
+    // Returns 'detail' (3-col + stats) or 'compact' (1-col, no stats).
+    // In 'auto' mode the threshold is 3 cards × 270px min-width + 2 gaps × 12px = 834px.
+    function getLayout(width, configLayout) {
+      if (configLayout === 'detail') return 'detail';
+      if (configLayout === 'compact') return 'compact';
+      return width >= 834 ? 'detail' : 'compact';
+    }
 
     function stripPort(address) {
       return address.replace(/:\d+$/, '');
@@ -31,12 +41,22 @@
       </div>`;
     }
 
-    function primaryCard(server, pihole1Href, pihole2Href) {
+    // Renders the query/response stats grid, shown only in detail layout.
+    function statsRow(queries, responses) {
+      return `
+        <div class="grid grid-cols-2 gap-1 mt-3 text-xs">
+          <div><div class="text-zinc-500 mb-0.5">Queries</div><div class="text-sm text-zinc-200">${queries.toLocaleString()}</div></div>
+          <div><div class="text-zinc-500 mb-0.5">Responses</div><div class="text-sm text-zinc-200">${responses.toLocaleString()}</div></div>
+        </div>`;
+    }
+
+    // Primary server card (Pi-hole). Renders as a link if a pihole href is configured.
+    function primaryCard(server, pihole1Href, pihole2Href, showStats) {
       const ip = stripPort(server.address);
       const href = server.order === 1 ? pihole1Href : server.order === 2 ? pihole2Href : null;
 
       const inner = `
-        <div class="flex items-start gap-3 mb-3">
+        <div class="flex items-start gap-3">
           ${iconWrapper(PIHOLE_ICON)}
           <div class="flex-1 min-w-0">
             <div class="flex items-start justify-between mb-1">
@@ -46,10 +66,7 @@
             <div class="text-xs text-zinc-400 font-mono">${ip}</div>
           </div>
         </div>
-        <div class="grid grid-cols-2 gap-1 text-xs">
-          <div><div class="text-xs text-zinc-500 mb-0.5">Queries</div><div class="text-sm text-zinc-200">${server.queries.toLocaleString()}</div></div>
-          <div><div class="text-xs text-zinc-500 mb-0.5">Responses</div><div class="text-sm text-zinc-200">${server.responses.toLocaleString()}</div></div>
-        </div>`;
+        ${showStats ? statsRow(server.queries, server.responses) : ''}`;
 
       if (href) {
         return `<a href="${href}" target="_blank" rel="noopener noreferrer" class="block bg-zinc-800 rounded-lg p-3 text-zinc-100 hover:bg-zinc-700 transition-colors">${inner}</a>`;
@@ -57,49 +74,63 @@
       return `<div class="bg-zinc-800 rounded-lg p-3">${inner}</div>`;
     }
 
-    function fallbackCard(fallbacks) {
+    // Fallback/cloud card — aggregates all fallback resolvers into a single card.
+    function fallbackCard(fallbacks, showStats) {
       const totalQueries = fallbacks.reduce((sum, s) => sum + s.queries, 0);
       const totalResponses = fallbacks.reduce((sum, s) => sum + s.responses, 0);
       const ipList = `<div class="text-xs text-zinc-400 font-mono">${fallbacks.map(s => stripPort(s.address)).join(', ')}</div>`;
 
       return `
         <div class="bg-zinc-800 rounded-lg p-3">
-          <div class="flex items-start gap-3 mb-3">
+          <div class="flex items-start gap-3">
             ${iconWrapper(CLOUDFLARE_ICON)}
             <div class="flex-1 min-w-0">
               <div class="font-medium text-zinc-200 mb-1">Cloud Failover</div>
               ${ipList}
             </div>
           </div>
-          <div class="grid grid-cols-2 gap-1 text-xs">
-            <div><div class="text-xs text-zinc-500 mb-0.5">Queries</div><div class="text-sm text-zinc-200">${totalQueries.toLocaleString()}</div></div>
-            <div><div class="text-xs text-zinc-500 mb-0.5">Responses</div><div class="text-sm text-zinc-200">${totalResponses.toLocaleString()}</div></div>
-          </div>
+          ${showStats ? statsRow(totalQueries, totalResponses) : ''}
         </div>`;
     }
+
+    const root = document.getElementById('root');
+
+    // Tracks the current layout tier so the ResizeObserver can avoid
+    // re-rendering when the tier hasn't actually changed.
+    let currentLayout = 'detail';
 
     function render(primaries, fallbacks, config) {
       const timestamp = new Date().toTimeString().slice(0, 8);
 
+      // Re-evaluate layout on every render so config changes picked up from
+      // /data are applied immediately, not just on the next resize event.
+      currentLayout = getLayout(root.offsetWidth, config.layout);
+      const detail = currentLayout === 'detail';
+      const cols = detail ? 3 : 1;
+
       const hasPrimaries = primaries && primaries.length > 0;
       const hasFallbacks = fallbacks && fallbacks.length > 0;
-      const grid = (hasPrimaries || hasFallbacks)
-        ? `<div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-            ${hasPrimaries ? primaries.map(s => primaryCard(s, config.pihole1Href, config.pihole2Href)).join('\n') : ''}
-            ${hasFallbacks ? fallbackCard(fallbacks) : ''}
-          </div>`
-        : '';
 
-      document.getElementById('root').innerHTML = `
-        ${grid}
-        <div class="mt-3 text-xs text-zinc-400 text-right">Last updated: ${timestamp}</div>`;
+      if (!hasPrimaries && !hasFallbacks) {
+        root.innerHTML = '';
+        return;
+      }
+
+      root.innerHTML = `
+        <div class="grid grid-cols-${cols} gap-3">
+          ${hasPrimaries ? primaries.map(s => primaryCard(s, config.pihole1Href, config.pihole2Href, detail)).join('\n') : ''}
+          ${hasFallbacks ? fallbackCard(fallbacks, detail) : ''}
+          <div style="grid-column: 1 / -1" class="text-xs text-zinc-400 text-right pr-1 pb-1">Last updated: ${timestamp}</div>
+        </div>`;
     }
 
     let cachedPrimaries = null;
     let cachedFallbacks = null;
-    let lastConfig = { pihole1Href: '#', pihole2Href: '#', refreshInterval: 10000 };
+    let lastConfig = { pihole1Href: '#', pihole2Href: '#', refreshInterval: 10000, layout: 'auto' };
     let refreshTimer = null;
 
+    // Fetches fresh data from /data and re-renders. On error the last known
+    // server state is preserved so the UI doesn't go blank on a transient failure.
     async function load() {
       try {
         const res = await fetch('/data');
@@ -109,6 +140,7 @@
           pihole1Href: data.pihole1Href,
           pihole2Href: data.pihole2Href,
           refreshInterval: data.refreshInterval,
+          layout: data.layout,
         };
 
         if (data.primaries !== null) {
@@ -125,6 +157,16 @@
         refreshTimer = setTimeout(load, lastConfig.refreshInterval);
       }
     }
+
+    // Re-renders when the container crosses the detail/compact threshold.
+    // Only fires when the layout tier actually changes, not on every resize event.
+    const observer = new ResizeObserver(([entry]) => {
+      const newLayout = getLayout(entry.contentRect.width, lastConfig.layout);
+      if (newLayout !== currentLayout) {
+        render(cachedPrimaries, cachedFallbacks, lastConfig);
+      }
+    });
+    observer.observe(root);
 
     load();
   </script>

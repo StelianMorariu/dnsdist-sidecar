@@ -30,6 +30,10 @@ const {
 } = process.env;
 
 const primaryThreshold = parseInt(PRIMARY_THRESHOLD, 10);
+const refreshInterval = parseInt(REFRESH_INTERVAL, 10);
+
+// Cached at startup — index.html is static and does not change at runtime
+const html = readFileSync(new URL('./index.html', import.meta.url), 'utf8');
 
 let lastHealthStatus = 'unreachable';
 
@@ -41,6 +45,22 @@ if (IS_DEV !== 'true') {
   }
 }
 
+const VALID_LAYOUTS = ['auto', 'detail', 'compact'];
+
+// Read config.json on every call so changes take effect on the next page refresh
+// without requiring a container restart. Falls back to 'auto' if the file is
+// missing, unreadable, or contains an unrecognised value.
+function readConfig() {
+  try {
+    const { layout } = JSON.parse(readFileSync(new URL('../config.json', import.meta.url), 'utf8'));
+    if (VALID_LAYOUTS.includes(layout)) return layout;
+  } catch {}
+  return 'auto';
+}
+
+// Fetches server data from the dnsdist REST API (or dev-data.json in IS_DEV mode).
+// Returns only the fields the client actually needs — primaries and fallbacks —
+// split by PRIMARY_THRESHOLD.
 async function fetchDnsDistData() {
   let json;
 
@@ -64,36 +84,16 @@ async function fetchDnsDistData() {
     }
   }
 
-  const { servers, statistics, pools, version } = json;
-
-  const mapped = servers.map(({ name, address, state, queries, responses, order, qps, latency, healthCheckFailures }) => ({
+  const mapped = json.servers.map(({ name, address, state, queries, responses, order }) => ({
     name,
     address,
     state,
     queries,
     responses,
     order,
-    qps,
-    latency,
-    healthCheckFailures,
   }));
 
-  const dnsPool = pools.find(p => p.name === 'dns') ?? {};
-
   return {
-    version,
-    statistics: {
-      cacheHits: statistics['cache-hits'],
-      cacheMisses: statistics['cache-misses'],
-      uptime: statistics['uptime'],
-      latencyAvg100: statistics['latency-avg100'],
-    },
-    pool: {
-      cacheEntries: dnsPool.cacheEntries,
-      cacheHits: dnsPool.cacheHits,
-      cacheMisses: dnsPool.cacheMisses,
-      cacheSize: dnsPool.cacheSize,
-    },
     primaries: mapped.filter(s => s.order < primaryThreshold),
     fallbacks: mapped.filter(s => s.order >= primaryThreshold),
   };
@@ -102,13 +102,15 @@ async function fetchDnsDistData() {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
+  // Serve the single-page UI
   if (req.method === 'GET' && url.pathname === '/') {
-    const html = readFileSync(new URL('./index.html', import.meta.url), 'utf8');
     res.writeHead(200, { 'Content-Type': 'text/html' });
     res.end(html);
     return;
   }
 
+  // Data endpoint — polled by the client on each refresh interval.
+  // Also re-reads config.json so layout changes are picked up without a restart.
   if (req.method === 'GET' && url.pathname === '/data') {
     let primaries = null;
     let fallbacks = null;
@@ -129,11 +131,14 @@ const server = http.createServer(async (req, res) => {
       fallbacks,
       pihole1Href: PIHOLE1_HREF,
       pihole2Href: PIHOLE2_HREF,
-      refreshInterval: parseInt(REFRESH_INTERVAL, 10),
+      refreshInterval,
+      layout: readConfig(),
     }));
     return;
   }
 
+  // Health check — used by Docker HEALTHCHECK and Homepage widget monitoring.
+  // Returns 200 if the last dnsdist fetch succeeded, 503 otherwise.
   if (req.method === 'GET' && url.pathname === '/health') {
     res.writeHead(lastHealthStatus === 'healthy' ? 200 : 503);
     res.end();

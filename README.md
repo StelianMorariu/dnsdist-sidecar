@@ -1,10 +1,12 @@
-# losmuertos-dnsdist
+# dnsdist-sidecar
 
-[![Docker Image](https://img.shields.io/badge/ghcr.io-losmuertos--dnsdist-blue?logo=docker&logoColor=white)](https://github.com/StelianMorariu/losmuertos-dnsdist/pkgs/container/losmuertos-dnsdist)
+[![Docker Image](https://img.shields.io/badge/ghcr.io-dnsdist--sidecar-blue?logo=docker&logoColor=white)](https://github.com/StelianMorariu/losmuertos-dnsdist/pkgs/container/dnsdist-sidecar)
 
 A lightweight iFrame widget for [Homepage](https://gethomepage.dev) that displays live status from a [dnsdist](https://dnsdist.org) DNS load balancer.
 
-![Screenshot](docs/screenshot.png)
+| Detail | Compact |
+|---|---|
+| ![Detail layout](docs/screenshot.png) | ![Compact layout](docs/screenshot_compact.png) |
 
 ## What it does
 
@@ -22,8 +24,8 @@ The page auto-refreshes client-side via `fetch` on a configurable interval. If t
 
 ```yaml
 services:
-  losmuertos-dnsdist:
-    image: ghcr.io/stelianmorariu/losmuertos-dnsdist:latest
+  dnsdist-sidecar:
+    image: ghcr.io/stelianmorariu/dnsdist-sidecar:latest
     ports:
       - "8000:8000"
     environment:
@@ -33,6 +35,8 @@ services:
       PIHOLE2_HREF: http://pihole2/admin
       PRIMARY_THRESHOLD: 10      # servers with order < threshold are primaries
       REFRESH_INTERVAL: 10000    # milliseconds
+    volumes:
+      - ./config.json:/app/config.json  # optional: override layout
     restart: unless-stopped
 ```
 
@@ -43,7 +47,7 @@ services:
     - dnsdist:
         widget:
           type: iframe
-          src: http://losmuertos-dnsdist:8000
+          src: http://dnsdist-sidecar:8000
           classes: h-36
 ```
 
@@ -58,6 +62,24 @@ services:
 | `PRIMARY_THRESHOLD` | No | `10` | Servers with `order < threshold` are shown as primaries |
 | `REFRESH_INTERVAL` | No | `10000` | Page refresh interval in milliseconds |
 | `IS_DEV` | No | — | Set to `true` to load data from `dev-data.json` instead of the API |
+
+## Layout configuration
+
+The display layout is controlled by `config.json`. The default is baked into the image — volume-mount your own copy to override it without rebuilding.
+
+```json
+{
+  "layout": "auto"
+}
+```
+
+| Value | Behaviour |
+|---|---|
+| `auto` | Detail view when the widget is ≥ 834px wide, compact otherwise |
+| `detail` | Always 3-column with query/response stats |
+| `compact` | Always single-column, stats hidden |
+
+Changes to `config.json` take effect on the next browser refresh — no container restart needed.
 
 ## Endpoints
 

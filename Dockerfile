@@ -14,6 +14,7 @@ WORKDIR /app
 COPY package.json ./
 RUN npm install --omit=dev
 
+COPY config.json ./
 COPY src/ ./src/
 
 EXPOSE 8000
