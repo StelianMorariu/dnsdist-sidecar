@@ -108,8 +108,6 @@
     let currentLayout = 'detail';
 
     function render(primaries, fallbacks, config) {
-      const timestamp = new Date().toTimeString().slice(0, 8);
-
       // Re-evaluate layout on every render so config changes picked up from
       // /data are applied immediately, not just on the next resize event.
       currentLayout = getLayout(root.offsetWidth, config.layout);
@@ -128,14 +126,13 @@
         <div class="grid grid-cols-${cols} gap-3">
           ${hasPrimaries ? primaries.map(s => primaryCard(s, config.pihole1Href, config.pihole2Href, detail, s.order === 1 ? config.primaryServerIcon : config.secondaryServerIcon)).join('\n') : ''}
           ${hasFallbacks ? fallbackCard(fallbacks, detail, config.failoverServerIcon) : ''}
-          <div style="grid-column: 1 / -1" class="text-xs text-zinc-400 text-right pr-1 pb-1">Last updated: ${timestamp}</div>
         </div>`;
     }
 
     let cachedPrimaries = null;
     let cachedFallbacks = null;
     let lastConfig = {
-      pihole1Href: '#', pihole2Href: '#', refreshInterval: 10000, layout: 'auto',
+      pihole1Href: '#', pihole2Href: '#', refreshInterval: 120000, layout: 'auto',
       primaryServerIcon: null, secondaryServerIcon: null, failoverServerIcon: null,
     };
     let refreshTimer = null;

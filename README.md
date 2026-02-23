@@ -34,7 +34,7 @@ services:
       PIHOLE1_HREF: http://pihole1/admin
       PIHOLE2_HREF: http://pihole2/admin
       PRIMARY_THRESHOLD: 10      # servers with order < threshold are primaries
-      REFRESH_INTERVAL: 10000    # milliseconds
+      REFRESH_INTERVAL: 120000   # milliseconds (default: 2 minutes)
     volumes:
       - ./config.json:/app/config.json  # optional: override layout
     restart: unless-stopped
@@ -48,7 +48,9 @@ services:
         widget:
           type: iframe
           src: http://dnsdist-sidecar:8000
-          classes: h-36
+          classes: h-56 md:h-40  # auto layout: compact on mobile, detail on wider screens
+          # classes: h-40        # detail layout only
+          # classes: h-56        # compact layout only
 ```
 
 ## Environment variables
@@ -60,7 +62,7 @@ services:
 | `PIHOLE1_HREF` | No | `#` | Link target for the first primary server card |
 | `PIHOLE2_HREF` | No | `#` | Link target for the second primary server card |
 | `PRIMARY_THRESHOLD` | No | `10` | Servers with `order < threshold` are shown as primaries |
-| `REFRESH_INTERVAL` | No | `10000` | Page refresh interval in milliseconds |
+| `REFRESH_INTERVAL` | No | `120000` | Page refresh interval in milliseconds |
 | `IS_DEV` | No | — | Set to `true` to load data from `dev-data.json` instead of the API |
 
 ## Layout configuration
