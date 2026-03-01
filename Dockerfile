@@ -1,18 +1,19 @@
-FROM node:alpine
+FROM node:20-alpine
 
 ARG VERSION=unknown
 LABEL org.opencontainers.image.title="dnsdist-sidecar" \
       org.opencontainers.image.description="dnsdist iFrame widget for Homepage" \
-      org.opencontainers.image.url="https://github.com/StelianMorariu/losmuertos-dnsdist" \
-      org.opencontainers.image.source="https://github.com/StelianMorariu/losmuertos-dnsdist" \
+      org.opencontainers.image.url="https://github.com/StelianMorariu/dnsdist-sidecar" \
+      org.opencontainers.image.source="https://github.com/StelianMorariu/dnsdist-sidecar" \
       org.opencontainers.image.version=$VERSION
 
 ENV APP_VERSION=$VERSION
+ENV NODE_ENV=production
 
 WORKDIR /app
 
-COPY package.json ./
-RUN npm install --omit=dev
+COPY package*.json ./
+RUN npm ci --omit=dev
 
 COPY config.json ./
 COPY src/ ./src/
