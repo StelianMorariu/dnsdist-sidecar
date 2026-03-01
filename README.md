@@ -1,6 +1,6 @@
 # dnsdist-sidecar
 
-[![Docker Image](https://img.shields.io/badge/ghcr.io-dnsdist--sidecar-blue?logo=docker&logoColor=white)](https://github.com/StelianMorariu/losmuertos-dnsdist/pkgs/container/dnsdist-sidecar) [![GitHub tag](https://img.shields.io/github/v/tag/StelianMorariu/losmuertos-dnsdist)](https://github.com/StelianMorariu/losmuertos-dnsdist/tags)
+[![Docker Image](https://img.shields.io/badge/ghcr.io-dnsdist--sidecar-blue?logo=docker&logoColor=white)](https://github.com/StelianMorariu/dnsdist-sidecar/pkgs/container/dnsdist-sidecar) [![GitHub tag](https://img.shields.io/github/v/tag/StelianMorariu/dnsdist-sidecar)](https://github.com/StelianMorariu/dnsdist-sidecar/tags)
 
 A lightweight iFrame widget for [Homepage](https://gethomepage.dev) that displays live status from a [dnsdist](https://dnsdist.org) DNS load balancer.
 
